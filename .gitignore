@@ -1,0 +1,5 @@
+node_modules/
+.wrangler/
+backend/index.js
+dist/
+*.log

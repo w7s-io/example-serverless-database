@@ -1,0 +1,10 @@
+{
+  "bindings": {
+    "d1": [
+      {
+        "binding": "DB",
+        "migrations": "migrations"
+      }
+    ]
+  }
+}

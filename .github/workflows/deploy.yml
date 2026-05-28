@@ -1,0 +1,79 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run check
+
+      - uses: w7s-io/w7s-cloud@v1
+        with:
+          token: ${{ github.token }}
+
+      - name: Smoke test D1
+        run: |
+          set -euo pipefail
+          base="https://w7s-io.w7s.cloud/example-serverless-database"
+          note="smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          for attempt in {1..12}; do
+            if body="$(curl -fsS "$base/api/health")"; then
+              echo "$body"
+              BODY="$body" node - <<'NODE'
+          const body = JSON.parse(process.env.BODY);
+          if (body.service !== "example-serverless-database") {
+            throw new Error(`Unexpected service: ${body.service}`);
+          }
+          NODE
+              break
+            fi
+            sleep 5
+          done
+
+          created="$(curl -fsS -X POST "$base/api/notes" \
+            -H "content-type: application/json" \
+            --data "{\"body\":\"$note\"}")"
+          echo "$created"
+          BODY="$created" EXPECTED="$note" node - <<'NODE'
+          const body = JSON.parse(process.env.BODY);
+          if (body.status !== "created") {
+            throw new Error(`Unexpected create status: ${body.status}`);
+          }
+          if (body.note?.body !== process.env.EXPECTED) {
+            throw new Error("Created note body did not match.");
+          }
+          NODE
+
+          list="$(curl -fsS "$base/api/notes")"
+          echo "$list"
+          BODY="$list" EXPECTED="$note" node - <<'NODE'
+          const body = JSON.parse(process.env.BODY);
+          if (!Array.isArray(body.notes)) {
+            throw new Error("Missing notes array.");
+          }
+          if (!body.notes.some((note) => note.body === process.env.EXPECTED)) {
+            throw new Error("Created note was not listed.");
+          }
+          NODE
