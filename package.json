@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild backend/src/index.ts --bundle --format=esm --platform=neutral --target=es2022 --outfile=backend/index.js",
+    "build": "esbuild backend/src/index.ts --bundle --format=esm --platform=neutral --target=es2022 --minify --legal-comments=none --outfile=backend/index.js",
     "check": "tsc --noEmit && npm run build",
     "db:generate": "drizzle-kit generate"
   },
